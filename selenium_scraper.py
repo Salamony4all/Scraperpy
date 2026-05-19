@@ -3,6 +3,7 @@ Selenium-based Brand Scraper (Upgraded for Cloud/Railway Deployment)
 Uses Headless Chrome to render SPAs, execute dynamic scrolling, and bypass anti-bot challenges.
 """
 
+import os
 import time
 import logging
 import re
@@ -21,6 +22,14 @@ from selenium.common.exceptions import TimeoutException, WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
 
 logger = logging.getLogger(__name__)
+
+# Expose availability flags and helpers to prevent import errors in orchestrators
+SELENIUM_AVAILABLE = True
+
+def scrape_with_fallback(*args, **kwargs):
+    """Fallback helper, defined to prevent import errors in brand_scraper.py"""
+    logger.warning("scrape_with_fallback called, but is a dummy function. Use SeleniumScraper directly.")
+    return None
 
 class SeleniumScraper:
     """
@@ -63,8 +72,27 @@ class SeleniumScraper:
         # Suppress DevTools logging
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
 
-        service = Service(ChromeDriverManager().install())
-        return webdriver.Chrome(service=service, options=options)
+        try:
+            # First try: Use ChromeDriverManager to download/manage the driver
+            logger.info("Initializing WebDriver using ChromeDriverManager...")
+            service = Service(ChromeDriverManager().install())
+            return webdriver.Chrome(service=service, options=options)
+        except Exception as e:
+            logger.warning(f"ChromeDriverManager initialization failed: {e}. Trying system Chromium/ChromeDriver fallback...")
+            
+            # Second try: Check common system Chromium paths for Linux/Railway containers
+            for path in ["/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/lib/chromium/chromium"]:
+                if os.path.exists(path):
+                    logger.info(f"Setting Chrome binary location to system Chromium path: {path}")
+                    options.binary_location = path
+                    break
+                    
+            try:
+                # Direct initialization relies on chromedriver being present in the PATH (standard for nix/apt packages)
+                return webdriver.Chrome(options=options)
+            except Exception as direct_e:
+                logger.error(f"Direct system Chrome initialization failed: {direct_e}")
+                raise direct_e
 
     def scrape_brand_website(self, website: str, brand_name: str) -> Dict:
         """

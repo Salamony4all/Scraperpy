@@ -1,0 +1,5 @@
+# Nixpacks configuration for Python Selenium Scraper
+# This installs Chromium and ChromeDriver in the Railway environment
+
+[phases.setup]
+nixPkgs = ["chromium", "chromedriver"]
