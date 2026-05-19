@@ -12,7 +12,7 @@ from urllib.parse import urljoin, urlparse, parse_qs
 from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)  # Enable DEBUG logging to see product extraction details
+logger.setLevel(logging.INFO)  # Use DEBUG only when actively debugging product extraction
 
 
 # --- BUG FIX: Direct Imports Only (No 'utils' fallback) ---
@@ -1686,10 +1686,10 @@ class ArchitonicScraper:
             
             # Use Clearbit API (no key needed for basic lookup)
             clearbit_url = f"https://logo.clearbit.com/{domain}"
-            logger.info(f"Attempting to fetch logo from Clearbit for domain: {domain}")
+            logger.debug(f"Attempting to fetch logo from Clearbit for domain: {domain}")
             
-            # Check if the logo URL is accessible
-            response = requests.head(clearbit_url, timeout=5, allow_redirects=True)
+            # Check if the logo URL is accessible (short timeout to avoid blocking)
+            response = requests.head(clearbit_url, timeout=2, allow_redirects=True)
             if response.status_code == 200:
                 logger.info(f"Found Clearbit logo for {brand_name}: {clearbit_url}")
                 return clearbit_url

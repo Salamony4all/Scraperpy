@@ -3,3 +3,9 @@
 
 [phases.setup]
 nixPkgs = ["chromium", "chromedriver"]
+
+[variables]
+# Tell the scraper where to find the Nix-installed Chromium binary
+CHROMIUM_BIN = "/usr/bin/chromium"
+# Ensure headless Chrome runs without GPU in containers
+CHROMIUM_FLAGS = "--no-sandbox --disable-gpu --disable-dev-shm-usage"

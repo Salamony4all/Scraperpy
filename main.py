@@ -1,4 +1,6 @@
 import logging
+import os
+import shutil
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional
@@ -57,6 +59,39 @@ async def scrape_brand(request: ScrapeRequest):
 @app.get("/health")
 async def health_check():
     """
-    Simple endpoint for Railway to verify the container is running properly.
+    Enhanced health check: reports Selenium/Chrome availability.
+    Lets you diagnose Railway deployment issues from the outside.
     """
-    return {"status": "online", "message": "Scraper API is running"}
+    # Check Selenium Python package availability
+    try:
+        from selenium_scraper import SELENIUM_AVAILABLE
+        selenium_ok = SELENIUM_AVAILABLE
+    except Exception:
+        selenium_ok = False
+
+    # Check if Chromium binary is discoverable
+    chrome_binary = None
+    chrome_paths = [
+        os.environ.get("CHROME_BIN"),
+        os.environ.get("CHROMIUM_BIN"),
+        "/usr/bin/chromium",
+        "/usr/bin/chromium-browser",
+        "/usr/bin/google-chrome",
+        "/usr/bin/google-chrome-stable",
+    ]
+    for path in chrome_paths:
+        if path and os.path.exists(path):
+            chrome_binary = path
+            break
+
+    # Check chromedriver on PATH
+    chromedriver_path = shutil.which("chromedriver")
+
+    return {
+        "status": "online",
+        "message": "Scraper API is running",
+        "selenium_packages_installed": selenium_ok,
+        "chrome_binary": chrome_binary or "NOT FOUND",
+        "chromedriver": chromedriver_path or "NOT FOUND",
+        "strategies_available": ["universal", "architonic", "italian", "requests", "selenium", "firecrawl"]
+    }

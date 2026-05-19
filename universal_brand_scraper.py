@@ -16,28 +16,18 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 try:
-    from selenium_scraper import SeleniumScraper
+    from selenium_scraper import SeleniumScraper, SELENIUM_AVAILABLE
     from selenium.webdriver.common.by import By
-    SELENIUM_AVAILABLE = True
 except ImportError:
-    try:
-        from selenium_scraper import SeleniumScraper
-        from selenium.webdriver.common.by import By
-        SELENIUM_AVAILABLE = True
-    except ImportError:
-        SELENIUM_AVAILABLE = False
-        By = None
-        logger.warning("Selenium not available")
+    SELENIUM_AVAILABLE = False
+    By = None
+    logger.warning("Selenium not available — SeleniumScraper will not be used")
 
 try:
-    from utils.architonic_scraper import ArchitonicScraper
+    from architonic_scraper import ArchitonicScraper
     ARCHITONIC_AVAILABLE = True
 except ImportError:
-    try:
-        from architonic_scraper import ArchitonicScraper
-        ARCHITONIC_AVAILABLE = True
-    except ImportError:
-        ARCHITONIC_AVAILABLE = False
+    ARCHITONIC_AVAILABLE = False
 
 
 class CategoryTreeBuilder:

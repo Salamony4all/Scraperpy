@@ -180,7 +180,7 @@ class ItalianFurnitureScraper:
                 time.sleep(2)
                 
                 # Refresh soup after scrolling
-            soup = BeautifulSoup(scraper.driver.page_source, 'html.parser')
+                soup = BeautifulSoup(scraper.driver.page_source, 'html.parser')
             
             # Find category links (use the website URL that actually worked)
             category_links = self._find_category_links(soup, website)
