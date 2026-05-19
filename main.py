@@ -20,6 +20,7 @@ class ScrapeRequest(BaseModel):
     url: str
     brand_name: str
     strategy: Optional[str] = "universal" # Defaults to 'universal' if not provided
+    js_scraper_url: Optional[str] = None
 
 @app.post("/api/scrape")
 async def scrape_brand(request: ScrapeRequest):
@@ -42,6 +43,59 @@ async def scrape_brand(request: ScrapeRequest):
         products_list = result.get("all_products", result.get("products", []))
         logo_url = result.get("logo", "")
         
+        # Determine the JS Scraper URL (either from request payload or environment)
+        js_scraper_url = request.js_scraper_url or os.environ.get("JS_SCRAPER_SERVICE_URL")
+        
+        if js_scraper_url:
+            try:
+                import requests as py_requests
+                import json
+                from datetime import datetime
+                
+                # Trim trailing slash if present
+                js_scraper_url = js_scraper_url.rstrip("/")
+                upload_url = f"{js_scraper_url}/brands/upload"
+                
+                sanitized_name = request.brand_name.lower().replace(" ", "_")
+                filename = f"{sanitized_name}-mid.json"
+                
+                final_brand = {
+                    "id": request.brand_name.lower().replace(" ", "-"),
+                    "name": request.brand_name,
+                    "website": request.url,
+                    "origin": "Railway-Python-Scraper",
+                    "budgetTier": "mid",
+                    "products": products_list,
+                    "brandInfo": {
+                        "name": request.brand_name,
+                        "logo": logo_url
+                    },
+                    "logo": logo_url,
+                    "lastScraped": datetime.utcnow().isoformat() + "Z"
+                }
+                
+                logger.info(f"☁️ [Auto-Upload] Sending finished scrape for '{request.brand_name}' directly to Railway volume storage via {upload_url}...")
+                headers = {
+                    "Content-Type": "text/plain",
+                    "X-Filename": filename
+                }
+                
+                response_upload = py_requests.post(
+                    upload_url,
+                    data=json.dumps(final_brand, indent=2),
+                    headers=headers,
+                    timeout=30
+                )
+                
+                if response_upload.status_code == 200:
+                    logger.info(f"✅ [Auto-Upload Success] Brand '{request.brand_name}' successfully persisted on Railway volume backup!")
+                else:
+                    logger.warning(f"⚠️ [Auto-Upload Warning] JS Scraper service returned status {response_upload.status_code}: {response_upload.text}")
+            except Exception as upload_err:
+                logger.error(f"❌ [Auto-Upload Failed] Error replicating brand data to Railway volume: {str(upload_err)}")
+        else:
+            logger.info("ℹ️ No JS_SCRAPER_SERVICE_URL configured or passed. Skipping automatic volume replication.")
+            
         return {
             "status": "success", 
             "products": products_list,
