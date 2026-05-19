@@ -1,31 +1,27 @@
-# Nixpacks configuration for Python Selenium Scraper on Railway
-# This installs Chromium, ChromeDriver, and their shared library dependencies.
-
 [phases.setup]
-# "..." preserves the default Nix packages from the Python provider
-nixPkgs = ["...", "chromium", "chromedriver"]
-
-# Shared libraries required by Chromium that may not be in the Nix store
-aptPkgs = [
-    "libnss3",
-    "libgconf-2-4",
-    "libfontconfig1",
-    "libx11-xcb1",
-    "libxcomposite1",
-    "libxcursor1",
-    "libxdamage1",
-    "libxext6",
-    "libxfixes3",
-    "libxi6",
-    "libxrandr2",
-    "libxrender1",
-    "libxss1",
-    "libxtst6",
-    "libglib2.0-0"
+nixPkgs = [
+    "...", 
+    "chromium", 
+    "chromedriver",
+    # Replacing aptPkgs with their Nix equivalents
+    "nss",
+    "gconf",
+    "fontconfig",
+    "xorg.libX11",
+    "xorg.libXcomposite",
+    "xorg.libXcursor",
+    "xorg.libXdamage",
+    "xorg.libXext",
+    "xorg.libXfixes",
+    "xorg.libXi",
+    "xorg.libXrandr",
+    "xorg.libXrender",
+    "xorg.libXScrnSaver",
+    "xorg.libXtst",
+    "glib"
 ]
 
 [variables]
-# Tell the scraper where to find Chromium (fallback if shutil.which fails)
-CHROMIUM_BIN = "/usr/bin/chromium"
-# Ensure headless Chrome runs without GPU in containers
-CHROMIUM_FLAGS = "--no-sandbox --disable-gpu --disable-dev-shm-usage"
+# Update the path to match the Nix environment standard
+CHROMIUM_BIN = "/run/current-system/sw/bin/chromium"
+CHROMIUM_FLAGS = "--headless --no-sandbox --disable-gpu --disable-dev-shm-usage"
