@@ -40,7 +40,57 @@ async def scrape_brand(request: ScrapeRequest):
         
         logger.info(f"✅ Scraping completed for {request.brand_name}")
         
-        products_list = result.get("all_products", result.get("products", []))
+        raw_products = result.get("all_products", result.get("products", []))
+        products_list = []
+        for p in raw_products:
+            # Standardize categories, hierarchy, and basic attributes
+            main_cat = p.get('mainCategory') or p.get('category') or p.get('main_category') or 'Furniture'
+            sub_cat = p.get('subCategory') or p.get('subcategory') or p.get('sub_category') or 'Featured'
+            family = p.get('family') or p.get('collection') or p.get('brand') or request.brand_name
+            model = p.get('model') or p.get('title') or p.get('modelName') or 'Unknown Product'
+            description = p.get('description') or ''
+            image_url = p.get('imageUrl') or p.get('image_url') or p.get('image') or ''
+            product_url = p.get('productUrl') or p.get('product_url') or p.get('source_url') or p.get('url') or ''
+            
+            price = p.get('price')
+            if price is None:
+                price = 0
+            else:
+                try:
+                    price = float(price)
+                except (ValueError, TypeError):
+                    price = 0
+            
+            # Map/build normalization structure so frontend dropdowns map properly
+            raw_norm = p.get('normalization')
+            if isinstance(raw_norm, dict):
+                norm = {
+                    'category': raw_norm.get('category') or main_cat,
+                    'subCategory': raw_norm.get('subCategory') or raw_norm.get('sub_category') or sub_cat,
+                    'rank': raw_norm.get('rank') or 1,
+                    'tags': raw_norm.get('tags') or [],
+                    'dimensions': raw_norm.get('dimensions') or None
+                }
+            else:
+                norm = {
+                    'category': main_cat,
+                    'subCategory': sub_cat,
+                    'rank': 1,
+                    'tags': [],
+                    'dimensions': None
+                }
+            
+            products_list.append({
+                "mainCategory": main_cat,
+                "subCategory": sub_cat,
+                "family": family,
+                "model": model,
+                "description": description,
+                "imageUrl": image_url,
+                "productUrl": product_url,
+                "price": price,
+                "normalization": norm
+            })
         logo_url = result.get("logo", "")
         
         # Determine the JS Scraper URL (either from request payload or environment)
