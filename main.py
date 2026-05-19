@@ -69,20 +69,21 @@ async def health_check():
     except Exception:
         selenium_ok = False
 
-    # Check if Chromium binary is discoverable
+    # Check if Chromium binary is discoverable (same logic as selenium_scraper)
     chrome_binary = None
-    chrome_paths = [
-        os.environ.get("CHROME_BIN"),
-        os.environ.get("CHROMIUM_BIN"),
-        "/usr/bin/chromium",
-        "/usr/bin/chromium-browser",
-        "/usr/bin/google-chrome",
-        "/usr/bin/google-chrome-stable",
-    ]
-    for path in chrome_paths:
-        if path and os.path.exists(path):
-            chrome_binary = path
+    # 1. Env vars
+    for env_key in ("CHROME_BIN", "CHROMIUM_BIN"):
+        val = os.environ.get(env_key)
+        if val and os.path.exists(val):
+            chrome_binary = val
             break
+    # 2. shutil.which (finds Nix binaries on PATH)
+    if not chrome_binary:
+        for name in ("chromium", "chromium-browser", "google-chrome", "google-chrome-stable"):
+            found = shutil.which(name)
+            if found:
+                chrome_binary = found
+                break
 
     # Check chromedriver on PATH
     chromedriver_path = shutil.which("chromedriver")
@@ -93,5 +94,6 @@ async def health_check():
         "selenium_packages_installed": selenium_ok,
         "chrome_binary": chrome_binary or "NOT FOUND",
         "chromedriver": chromedriver_path or "NOT FOUND",
+        "path_env": os.environ.get("PATH", "N/A")[:500],
         "strategies_available": ["universal", "architonic", "italian", "requests", "selenium", "firecrawl"]
     }

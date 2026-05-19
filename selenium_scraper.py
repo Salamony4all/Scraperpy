@@ -7,6 +7,7 @@ Every specialized scraper (Architonic, Italian, Universal) goes through this fil
 """
 
 import os
+import shutil
 import time
 import logging
 import re
@@ -73,10 +74,15 @@ class SeleniumScraper:
     def _get_lean_driver(self) -> 'webdriver.Chrome':
         """
         Configures and returns a highly optimized, headless Chrome WebDriver.
-        Uses a multi-fallback strategy:
-          1. ChromeDriverManager (auto-download)
-          2. System Chromium at well-known Nix/apt paths
-          3. Plain webdriver.Chrome() hoping chromedriver is on PATH
+
+        Fallback priority (Railway/Nix compatible):
+          1. System-installed chromium + chromedriver (found via PATH / shutil.which)
+          2. ChromeDriverManager auto-download (only if system binaries absent)
+          3. Bare webdriver.Chrome() as last resort
+
+        Status code 127 means the binary's shared-library deps are missing.
+        That's why we MUST prefer the Nix-installed binaries (they carry their
+        own deps in the Nix store) over independently-downloaded ones.
         """
         options = Options()
 
@@ -108,26 +114,71 @@ class SeleniumScraper:
         options.add_experimental_option("prefs", prefs)
         options.add_experimental_option("excludeSwitches", ["enable-logging"])
 
-        # --- Detect system Chromium binary (Railway / Nix / apt) ---
-        system_chrome_paths = [
-            os.environ.get("CHROME_BIN"),               # explicit env var
-            os.environ.get("CHROMIUM_BIN"),              # explicit env var
-            "/usr/bin/chromium",                         # Nix / Alpine
-            "/usr/bin/chromium-browser",                 # Debian / Ubuntu
-            "/usr/lib/chromium/chromium",                # some distros
-            "/usr/bin/google-chrome",                    # google-chrome apt
-            "/usr/bin/google-chrome-stable",             # stable channel
-        ]
-
-        for path in system_chrome_paths:
-            if path and os.path.exists(path):
-                logger.info(f"Using system Chromium binary: {path}")
-                options.binary_location = path
+        # ----------------------------------------------------------------
+        # STEP A: Discover system Chromium BROWSER binary
+        # Nix puts binaries on PATH, but NOT in /usr/bin.
+        # shutil.which() honours PATH so it finds Nix binaries correctly.
+        # ----------------------------------------------------------------
+        chromium_binary = None
+        # 1. Explicit env var (highest priority)
+        for env_key in ("CHROME_BIN", "CHROMIUM_BIN"):
+            val = os.environ.get(env_key)
+            if val and os.path.isfile(val):
+                chromium_binary = val
                 break
 
-        # --- Strategy 1: ChromeDriverManager (auto-download) ---
+        # 2. shutil.which() — finds Nix-installed binary on PATH
+        if not chromium_binary:
+            for name in ("chromium", "chromium-browser", "google-chrome", "google-chrome-stable"):
+                found = shutil.which(name)
+                if found:
+                    chromium_binary = found
+                    break
+
+        # 3. Hardcoded well-known paths (rare fallback)
+        if not chromium_binary:
+            for path in ("/usr/bin/chromium", "/usr/bin/chromium-browser",
+                         "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable",
+                         "/usr/lib/chromium/chromium"):
+                if os.path.isfile(path):
+                    chromium_binary = path
+                    break
+
+        if chromium_binary:
+            logger.info(f"✅ Found system Chromium binary: {chromium_binary}")
+            options.binary_location = chromium_binary
+        else:
+            logger.warning("⚠️  No system Chromium binary found — driver may fail")
+
+        # ----------------------------------------------------------------
+        # STEP B: Discover system ChromeDriver binary
+        # ----------------------------------------------------------------
+        system_chromedriver = None
+        for name in ("chromedriver",):
+            found = shutil.which(name)
+            if found:
+                system_chromedriver = found
+                break
+
+        # ----------------------------------------------------------------
+        # STRATEGY 1: System chromedriver (Nix-installed, compatible libs)
+        # ----------------------------------------------------------------
+        if system_chromedriver:
+            try:
+                logger.info(f"Trying Nix/system chromedriver: {system_chromedriver}")
+                service = Service(executable_path=system_chromedriver)
+                driver = webdriver.Chrome(service=service, options=options)
+                driver.set_page_load_timeout(self.timeout)
+                logger.info("✅ WebDriver initialized via SYSTEM chromedriver")
+                return driver
+            except Exception as e:
+                logger.warning(f"System chromedriver failed: {e}")
+
+        # ----------------------------------------------------------------
+        # STRATEGY 2: ChromeDriverManager (auto-download — may fail in Nix)
+        # ----------------------------------------------------------------
         try:
-            logger.info("Initializing WebDriver via ChromeDriverManager...")
+            logger.info("Falling back to ChromeDriverManager (auto-download)...")
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=options)
             driver.set_page_load_timeout(self.timeout)
@@ -136,18 +187,21 @@ class SeleniumScraper:
         except Exception as e:
             logger.warning(f"ChromeDriverManager failed: {e}")
 
-        # --- Strategy 2: System chromedriver on PATH ---
+        # ----------------------------------------------------------------
+        # STRATEGY 3: Bare webdriver.Chrome() — Selenium's auto-detection
+        # ----------------------------------------------------------------
         try:
-            logger.info("Trying system chromedriver on PATH...")
+            logger.info("Last resort: bare webdriver.Chrome()...")
             driver = webdriver.Chrome(options=options)
             driver.set_page_load_timeout(self.timeout)
-            logger.info("✅ WebDriver initialized via system chromedriver")
+            logger.info("✅ WebDriver initialized via Selenium auto-detection")
             return driver
         except Exception as e:
-            logger.error(f"System chromedriver also failed: {e}")
+            logger.error(f"All Chrome init strategies failed: {e}")
             raise RuntimeError(
                 "Cannot initialize Chrome WebDriver. "
-                "Ensure chromium + chromedriver are installed (nixpacks.toml or apt)."
+                "Ensure chromium + chromedriver Nix packages are installed "
+                "and on PATH. Check nixpacks.toml configuration."
             ) from e
 
     # ------------------------------------------------------------------
