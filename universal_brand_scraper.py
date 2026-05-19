@@ -16,7 +16,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 try:
-    from utils.selenium_scraper import SeleniumScraper
+    from selenium_scraper import SeleniumScraper
     from selenium.webdriver.common.by import By
     SELENIUM_AVAILABLE = True
 except ImportError:

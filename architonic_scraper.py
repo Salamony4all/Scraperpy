@@ -14,19 +14,16 @@ from bs4 import BeautifulSoup
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)  # Enable DEBUG logging to see product extraction details
 
+
+# --- BUG FIX: Direct Imports Only (No 'utils' fallback) ---
 try:
-    from utils.selenium_scraper import SeleniumScraper, SELENIUM_AVAILABLE
+    from selenium_scraper import SeleniumScraper, SELENIUM_AVAILABLE
     from selenium.webdriver.common.by import By
 except ImportError:
-    try:
-        from selenium_scraper import SeleniumScraper, SELENIUM_AVAILABLE
-        from selenium.webdriver.common.by import By
-    except ImportError:
-        SELENIUM_AVAILABLE = False
-        SeleniumScraper = None
-        By = None
-        logger.warning("Selenium scraper not available")
-
+    SELENIUM_AVAILABLE = False
+    SeleniumScraper = None
+    By = None
+    logger.warning("Selenium scraper not available")
 
 class ArchitonicScraper:
     """Scraper specifically for Architonic.com product collections"""

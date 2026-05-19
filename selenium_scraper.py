@@ -37,8 +37,9 @@ class SeleniumScraper:
     Optimized for low-memory cloud environments.
     """
     
-    def __init__(self):
-        self.timeout = 20
+    def __init__(self, headless: bool = True, timeout: int = 20, *args, **kwargs):
+        self.timeout = timeout
+        self.headless = headless
         
     def _get_lean_driver(self) -> webdriver.Chrome:
         """
