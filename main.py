@@ -36,8 +36,17 @@ async def scrape_brand(request: ScrapeRequest):
         )
         
         logger.info(f"✅ Scraping completed for {request.brand_name}")
+        
+        products_list = result.get("all_products", result.get("products", []))
+        logo_url = result.get("logo", "")
+        
         return {
             "status": "success", 
+            "products": products_list,
+            "brandInfo": {
+                "name": request.brand_name,
+                "logo": logo_url
+            },
             "data": result
         }
         
