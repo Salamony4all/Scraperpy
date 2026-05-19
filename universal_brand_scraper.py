@@ -20,15 +20,24 @@ try:
     from selenium.webdriver.common.by import By
     SELENIUM_AVAILABLE = True
 except ImportError:
-    SELENIUM_AVAILABLE = False
-    By = None
-    logger.warning("Selenium not available")
+    try:
+        from selenium_scraper import SeleniumScraper
+        from selenium.webdriver.common.by import By
+        SELENIUM_AVAILABLE = True
+    except ImportError:
+        SELENIUM_AVAILABLE = False
+        By = None
+        logger.warning("Selenium not available")
 
 try:
     from utils.architonic_scraper import ArchitonicScraper
     ARCHITONIC_AVAILABLE = True
 except ImportError:
-    ARCHITONIC_AVAILABLE = False
+    try:
+        from architonic_scraper import ArchitonicScraper
+        ARCHITONIC_AVAILABLE = True
+    except ImportError:
+        ARCHITONIC_AVAILABLE = False
 
 
 class CategoryTreeBuilder:

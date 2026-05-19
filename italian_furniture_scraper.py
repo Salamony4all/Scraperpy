@@ -91,7 +91,10 @@ class ItalianFurnitureScraper:
         Returns:
             Dictionary with scraped data
         """
-        from utils.selenium_scraper import SeleniumScraper
+        try:
+            from utils.selenium_scraper import SeleniumScraper
+        except ImportError:
+            from selenium_scraper import SeleniumScraper
         
         logger.info(f"🇮🇹 Starting Italian Furniture Scraper for {brand_name}")
         logger.info(f"Original Website: {website}")

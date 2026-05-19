@@ -18,10 +18,14 @@ try:
     from utils.selenium_scraper import SeleniumScraper, SELENIUM_AVAILABLE
     from selenium.webdriver.common.by import By
 except ImportError:
-    SELENIUM_AVAILABLE = False
-    SeleniumScraper = None
-    By = None
-    logger.warning("Selenium scraper not available")
+    try:
+        from selenium_scraper import SeleniumScraper, SELENIUM_AVAILABLE
+        from selenium.webdriver.common.by import By
+    except ImportError:
+        SELENIUM_AVAILABLE = False
+        SeleniumScraper = None
+        By = None
+        logger.warning("Selenium scraper not available")
 
 
 class ArchitonicScraper:

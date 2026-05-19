@@ -5,8 +5,20 @@ Fetches and adds product images and descriptions to BOQ data
 
 import logging
 from typing import Dict, List
-from utils.universal_brand_scraper import UniversalBrandScraper
-from utils.image_helper import download_image
+try:
+    from utils.universal_brand_scraper import UniversalBrandScraper
+except ImportError:
+    from universal_brand_scraper import UniversalBrandScraper
+
+try:
+    from utils.image_helper import download_image
+except ImportError:
+    try:
+        from image_helper import download_image
+    except ImportError:
+        def download_image(url):
+            return None
+
 import os
 
 logger = logging.getLogger(__name__)

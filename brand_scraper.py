@@ -21,18 +21,26 @@ logger = logging.getLogger(__name__)
 try:
     from utils.selenium_scraper import SeleniumScraper, SELENIUM_AVAILABLE, scrape_with_fallback
 except ImportError:
-    SELENIUM_AVAILABLE = False
-    SeleniumScraper = None
-    scrape_with_fallback = None
-    logger.warning("Selenium scraper not available")
+    try:
+        from selenium_scraper import SeleniumScraper, SELENIUM_AVAILABLE, scrape_with_fallback
+    except ImportError:
+        SELENIUM_AVAILABLE = False
+        SeleniumScraper = None
+        scrape_with_fallback = None
+        logger.warning("Selenium scraper not available")
 
 try:
     from utils.architonic_scraper import ArchitonicScraper
     ARCHITONIC_AVAILABLE = True
 except ImportError:
-    ARCHITONIC_AVAILABLE = False
-    ArchitonicScraper = None
-    logger.warning("Architonic scraper not available")
+    try:
+        from architonic_scraper import ArchitonicScraper
+        ARCHITONIC_AVAILABLE = True
+    except ImportError:
+        ARCHITONIC_AVAILABLE = False
+        ArchitonicScraper = None
+        logger.warning("Architonic scraper not available")
+
 
 
 class BrandScraper:
@@ -1464,3 +1472,77 @@ class BrandScraper:
         except Exception as e:
             logger.debug(f"Error extracting logo: {e}")
             return None
+
+
+class ScrapingOrchestrator:
+    """
+    Orchestrator that routes scraping requests to the appropriate scraper strategy.
+    Strategies:
+      - universal: UniversalBrandScraper (intelligently falls back from Requests to Selenium, detects hierarchy/categories)
+      - architonic: ArchitonicScraper (scrapes brand pages on Architonic.com)
+      - italian: ItalianFurnitureScraper (scrapes Italian brands like Martex, Manerba, etc.)
+      - selenium: SeleniumScraper (force Selenium)
+      - requests: RequestsBrandScraper (force static scraping)
+      - firecrawl: Behavior matching an advanced universal crawler with Selenium (complex sites fallback)
+    """
+    def __init__(self):
+        # Lazy load scrapers to avoid unnecessary import or driver initialization issues
+        self._universal_scraper = None
+        self._italian_scraper = None
+        self._architonic_scraper = None
+        self._selenium_scraper = None
+        self._requests_scraper = None
+
+    def scrape_brand(self, url: str, brand_name: str, strategy: Optional[str] = "universal") -> dict:
+        strategy = (strategy or "universal").lower()
+        logger.info(f"Orchestrator routing scrape request for brand '{brand_name}' using strategy '{strategy}' to: {url}")
+        
+        try:
+            if strategy == "universal":
+                from universal_brand_scraper import UniversalBrandScraper
+                if not self._universal_scraper:
+                    self._universal_scraper = UniversalBrandScraper()
+                return self._universal_scraper.scrape_brand_website(url, brand_name)
+                
+            elif strategy == "italian":
+                from italian_furniture_scraper import ItalianFurnitureScraper
+                if not self._italian_scraper:
+                    self._italian_scraper = ItalianFurnitureScraper()
+                return self._italian_scraper.scrape_brand_website(url, brand_name)
+                
+            elif strategy == "architonic":
+                from architonic_scraper import ArchitonicScraper
+                if not self._architonic_scraper:
+                    self._architonic_scraper = ArchitonicScraper(use_selenium=True)
+                return self._architonic_scraper.scrape_collection(url, brand_name)
+                
+            elif strategy == "selenium":
+                from selenium_scraper import SeleniumScraper
+                if not self._selenium_scraper:
+                    self._selenium_scraper = SeleniumScraper()
+                return self._selenium_scraper.scrape_brand_website(url, brand_name)
+                
+            elif strategy == "requests":
+                from requests_brand_scraper import RequestsBrandScraper
+                if not self._requests_scraper:
+                    self._requests_scraper = RequestsBrandScraper()
+                return self._requests_scraper.scrape_brand_website(url, brand_name)
+                
+            elif strategy == "firecrawl":
+                from universal_brand_scraper import UniversalBrandScraper
+                logger.info("Firecrawl strategy selected - using UniversalBrandScraper with Selenium force-enabled")
+                if not self._universal_scraper:
+                    self._universal_scraper = UniversalBrandScraper()
+                return self._universal_scraper.scrape_brand_website(url, brand_name, use_selenium=True)
+                
+            else:
+                logger.warning(f"Unknown scraping strategy: '{strategy}'. Falling back to universal scraper.")
+                from universal_brand_scraper import UniversalBrandScraper
+                if not self._universal_scraper:
+                    self._universal_scraper = UniversalBrandScraper()
+                return self._universal_scraper.scrape_brand_website(url, brand_name)
+                
+        except Exception as e:
+            logger.exception(f"Error in ScrapingOrchestrator executing strategy '{strategy}': {e}")
+            raise e
+

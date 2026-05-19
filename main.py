@@ -1,31 +1,53 @@
+import logging
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-# Import your existing orchestrator and selenium scraper
+from typing import Optional
+
+# Import your existing orchestrator
 from brand_scraper import ScrapingOrchestrator
-from selenium_scraper import SeleniumScraper
 
-app = FastAPI(title="Open Source Python Scraper")
+# Set up basic logging so you can see what's happening in the Railway logs
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = FastAPI(title="BOQ-FLOW Python Scraper API")
 orchestrator = ScrapingOrchestrator()
-selenium_engine = SeleniumScraper()
 
+# Define the expected JSON payload from your Node.js app
 class ScrapeRequest(BaseModel):
     url: str
     brand_name: str
+    strategy: Optional[str] = "universal" # Defaults to 'universal' if not provided
 
 @app.post("/api/scrape")
 async def scrape_brand(request: ScrapeRequest):
+    """
+    Main scraping endpoint. Receives the URL, brand name, and strategy,
+    then delegates to the orchestrator.
+    """
+    logger.info(f"🚀 Received {request.strategy.upper()} scraping request for {request.brand_name} ({request.url})")
+    
     try:
-        # You can use your orchestrator, or force it directly to Selenium
-        # If your orchestrator was previously relying on Firecrawl as the fallback, 
-        # make sure to update it to use selenium_engine instead!
+        # Pass the strategy to your orchestrator so it knows which Python script to trigger
+        result = orchestrator.scrape_brand(
+            url=request.url, 
+            brand_name=request.brand_name, 
+            strategy=request.strategy
+        )
         
-        print(f"🚀 Launching Open-Source Extraction for {request.url}")
-        result = orchestrator.scrape_brand(request.url, request.brand_name)
+        logger.info(f"✅ Scraping completed for {request.brand_name}")
+        return {
+            "status": "success", 
+            "data": result
+        }
         
-        return {"status": "success", "data": result}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"❌ Scraping failed for {request.brand_name}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Scraping failed: {str(e)}")
 
 @app.get("/health")
 async def health_check():
-    return {"status": "online"}
+    """
+    Simple endpoint for Railway to verify the container is running properly.
+    """
+    return {"status": "online", "message": "Scraper API is running"}
